@@ -78,7 +78,7 @@ func NewGetScoreRequest(name string) *http.Request {
 	return req
 }
 
-func GetLeagueFromResponse(t testing.TB, body io.Reader) (league []domain.Player) {
+func GetLeagueFromResponse(t testing.TB, body io.Reader) (league domain.League) {
 	t.Helper()
 	err := json.NewDecoder(body).Decode(&league)
 
