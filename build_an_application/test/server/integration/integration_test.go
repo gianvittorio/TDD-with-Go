@@ -3,6 +3,7 @@ package integration_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"example.com/build_an_application/src/server"
@@ -14,10 +15,18 @@ func TestRecordingWinsAndRetrievingThem(t *testing.T) {
 	webserver := server.PlayerServer{store}
 	player := "Pepper"
 
-	webserver.ServeHTTP(httptest.NewRecorder(), server.NewPostWinRequest(player))
-	webserver.ServeHTTP(httptest.NewRecorder(), server.NewPostWinRequest(player))
-	webserver.ServeHTTP(httptest.NewRecorder(), server.NewPostWinRequest(player))
+	
+	groupSize := 3
+	var wg sync.WaitGroup
+	wg.Add(groupSize)
+	for range groupSize {
+		go func() {
+			webserver.ServeHTTP(httptest.NewRecorder(), server.NewPostWinRequest(player))
+			wg.Done()
+		}()
+	}
 
+	wg.Wait()
 	response := httptest.NewRecorder()
 	webserver.ServeHTTP(response, server.NewGetScoreRequest(player))
 	server.AssertStatus(t, response.Code, http.StatusOK)
