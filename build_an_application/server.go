@@ -3,24 +3,39 @@ package poker
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
-	"testing"
 )
 
+// PlayerStore stores score information about players.
+type PlayerStore interface {
+	GetPlayerScore(name string) int
+	RecordWin(name string)
+	GetLeague() League
+}
+
+// Player stores a name with a number of wins.
+type Player struct {
+	Name string
+	Wins int
+}
+
+// PlayerServer is a HTTP interface for player information.
 type PlayerServer struct {
 	store PlayerStore
 	http.Handler
 }
 
+const jsonContentType = "application/json"
+
+// NewPlayerServer creates a PlayerServer with routing configured.
 func NewPlayerServer(store PlayerStore) *PlayerServer {
 	p := new(PlayerServer)
 
 	p.store = store
 
 	router := http.NewServeMux()
-	router.Handle("/league", http.HandlerFunc(p.leagueHandler))
+	router.Handle("/League", http.HandlerFunc(p.leagueHandler))
 	router.Handle("/players/", http.HandlerFunc(p.playersHandler))
 
 	p.Handler = router
@@ -28,16 +43,9 @@ func NewPlayerServer(store PlayerStore) *PlayerServer {
 	return p
 }
 
-func (p *PlayerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	p.Handler.ServeHTTP(w, r)
-}
-
-const JsonContentType = "application/json"
-
 func (p *PlayerServer) leagueHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", JsonContentType)
+	w.Header().Set("content-type", jsonContentType)
 	json.NewEncoder(w).Encode(p.store.GetLeague())
-	w.WriteHeader(http.StatusOK)
 }
 
 func (p *PlayerServer) playersHandler(w http.ResponseWriter, r *http.Request) {
@@ -53,40 +61,15 @@ func (p *PlayerServer) playersHandler(w http.ResponseWriter, r *http.Request) {
 
 func (p *PlayerServer) showScore(w http.ResponseWriter, player string) {
 	score := p.store.GetPlayerScore(player)
+
 	if score == 0 {
 		w.WriteHeader(http.StatusNotFound)
 	}
 
-	fmt.Fprint(w, p.store.GetPlayerScore(player))
+	fmt.Fprint(w, score)
 }
 
 func (p *PlayerServer) processWin(w http.ResponseWriter, player string) {
 	p.store.RecordWin(player)
 	w.WriteHeader(http.StatusAccepted)
-}
-
-func NewPostWinRequest(name string) *http.Request {
-	req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("/players/%s", name), nil)
-	return req
-}
-
-func NewGetScoreRequest(name string) *http.Request {
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/players/%s", name), nil)
-	return req
-}
-
-func GetLeagueFromResponse(t testing.TB, body io.Reader) (league League) {
-	t.Helper()
-	err := json.NewDecoder(body).Decode(&league)
-
-	if err != nil {
-		t.Fatalf("Unable to parse response from server %q into slice of Player, '%v'", body, err)
-	}
-
-	return
-}
-
-func NewLeagueRequest() *http.Request {
-	req, _ := http.NewRequest(http.MethodGet, "/league", nil)
-	return req
 }

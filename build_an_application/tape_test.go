@@ -6,10 +6,10 @@ import (
 )
 
 func TestTape_Write(t *testing.T) {
-	file, clean := CreateTempFile(t, "12345")
+	file, clean := createTempFile(t, "12345")
 	defer clean()
 
-	tape := &Tape{File: file}
+	tape := &tape{file}
 
 	tape.Write([]byte("abc"))
 

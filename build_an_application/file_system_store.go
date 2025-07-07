@@ -8,11 +8,13 @@ import (
 	"sort"
 )
 
+// FileSystemPlayerStore stores players in the filesystem.
 type FileSystemPlayerStore struct {
-	Database *json.Encoder
-	League   League
+	database *json.Encoder
+	league   League
 }
 
+// NewFileSystemPlayerStore creates a FileSystemPlayerStore initialising the store if needed.
 func NewFileSystemPlayerStore(file *os.File) (*FileSystemPlayerStore, error) {
 
 	err := initialisePlayerDBFile(file)
@@ -28,9 +30,30 @@ func NewFileSystemPlayerStore(file *os.File) (*FileSystemPlayerStore, error) {
 	}
 
 	return &FileSystemPlayerStore{
-		Database: json.NewEncoder(&Tape{file}),
-		League:   league,
+		database: json.NewEncoder(&tape{file}),
+		league:   league,
 	}, nil
+}
+
+// FileSystemPlayerStoreFromFile creates a PlayerStore from the contents of a JSON file found at path.
+func FileSystemPlayerStoreFromFile(path string) (*FileSystemPlayerStore, func(), error) {
+	db, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("problem opening %s %v", path, err)
+	}
+
+	closeFunc := func() {
+		db.Close()
+	}
+
+	store, err := NewFileSystemPlayerStore(db)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("problem creating file system player store, %v ", err)
+	}
+
+	return store, closeFunc, nil
 }
 
 func initialisePlayerDBFile(file *os.File) error {
@@ -50,16 +73,19 @@ func initialisePlayerDBFile(file *os.File) error {
 	return nil
 }
 
+// GetLeague returns the Scores of all the players.
 func (f *FileSystemPlayerStore) GetLeague() League {
-	sort.Slice(f.League, func(i, j int) bool {
-		return f.League[i].Wins > f.League[j].Wins
+	sort.Slice(f.league, func(i, j int) bool {
+		return f.league[i].Wins > f.league[j].Wins
 	})
-	return f.League
+	return f.league
 }
 
-
+// GetPlayerScore retrieves a player's score.
 func (f *FileSystemPlayerStore) GetPlayerScore(name string) int {
-	player := f.GetLeague().Find(name)
+
+	player := f.league.Find(name)
+
 	if player != nil {
 		return player.Wins
 	}
@@ -67,34 +93,15 @@ func (f *FileSystemPlayerStore) GetPlayerScore(name string) int {
 	return 0
 }
 
+// RecordWin will store a win for a player, incrementing wins if already known.
 func (f *FileSystemPlayerStore) RecordWin(name string) {
-	player := f.League.Find(name)
+	player := f.league.Find(name)
 
 	if player != nil {
 		player.Wins++
 	} else {
-		f.League = append(f.League, Player{Name: name, Wins: 1})
+		f.league = append(f.league, Player{name, 1})
 	}
 
-	f.Database.Encode(f.League)
-}
-
-func FileSystemPlayerStoreFromFile(path string) (*FileSystemPlayerStore, func(), error) {
-	db, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("problem opening %s %v", path, err)
-	}
-
-	closeFunc := func() {
-		db.Close()
-	}
-
-	store, err := NewFileSystemPlayerStore(db)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("problem creating file system player store, %v ", err)
-	}
-
-	return store, closeFunc, nil
+	f.database.Encode(f.league)
 }

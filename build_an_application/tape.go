@@ -5,13 +5,12 @@ import (
 	"os"
 )
 
-type Tape struct {
-	File *os.File
+type tape struct {
+	file *os.File
 }
 
-func (t *Tape) Write(p []byte) (n int, err error) {
-	t.File.Truncate(0)
-	t.File.Seek(0, io.SeekStart)
-
-	return t.File.Write(p)
+func (t *tape) Write(p []byte) (n int, err error) {
+	t.file.Truncate(0)
+	t.file.Seek(0, io.SeekStart)
+	return t.file.Write(p)
 }
